@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Password Strength — Mini Project (HTML/CSS/JS)</title>
+  <meta name="color-scheme" content="dark light" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    /* ========= THEME ========= */
+    :root{
+      --bg:#0b1020; --card:#111831; --text:#eaf0ff; --muted:#9fb0dc; --surface:#101624;
+      --border:rgba(255,255,255,.16); --accent:#00d0b5; /* teal */
+      --ok:#00c853; --warn:#ffb300; --bad:#ff5252; --shadow:0 10px 28px rgba(0,0,0,.35); --chip:#0f1a2e;
+      --meter:#ff5252; /* dynamic via [data-strength] */
+    }
+    [data-theme="light"]{
+      --bg:#f3f5f8; --card:#ffffff; --surface:#f5f6f9; --text:#0f1733; --muted:#546385;
+      --border:rgba(0,0,0,.12); --accent:#00bfa6; --chip:#f1f3f7;
+    }
+    [data-strength="weak"]  { --meter: var(--bad); }
+    [data-strength="medium"]{ --meter: var(--warn); }
+    [data-strength="strong"]{ --meter: var(--ok); }
+
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{
+      margin:0;display:grid;place-items:center;background:var(--bg);color:var(--text);
+      font:16px/1.55 'Inter',system-ui,-apple-system,Segoe UI,Roboto,Arial; padding:16px;
+      transition:background .3s,color .3s;
+    }
+
+    .app{width:min(1000px,96vw);background:var(--card);border:1px solid var(--border);
+      border-radius:18px; box-shadow:var(--shadow); padding:22px 18px}
+
+    header{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:8px}
+    h1{font-size:clamp(18px,3.4vw,26px);margin:0}
+    .muted{color:var(--muted);font-size:14px}
+    .row{display:grid;grid-template-columns:1fr;gap:18px}
+    @media (min-width:960px){.row{grid-template-columns:1.15fr .95fr}}
+
+    /* inputs */
+    label{display:block;margin:.25rem 0 .5rem;color:var(--muted)}
+    .input-wrap{position:relative}
+    input[type=password],input[type=text]{
+      width:100%;padding:14px 44px 14px 12px;border-radius:12px;border:1px solid var(--border);
+      background:transparent;color:var(--text);font-size:16px;outline:none;transition:box-shadow .15s,border-color .15s
+    }
+    input:focus{box-shadow:0 0 0 4px color-mix(in srgb,var(--accent) 28%, transparent); border-color:color-mix(in srgb,var(--accent) 70%, var(--border))}
+    .toggle-eye{position:absolute;right:6px;top:50%;translate:0 -50%; border:0;background:transparent;color:var(--muted);cursor:pointer;padding:6px 10px;border-radius:10px}
+    .toggle-eye:hover{color:var(--text);background:color-mix(in srgb,var(--text) 8%, transparent)}
+
+    /* meter + animations */
+    .meter{margin:12px 0 6px;height:14px;border-radius:999px;border:1px solid var(--border);overflow:hidden; background:var(--surface)}
+    .fill{height:100%;width:0%;background:var(--meter);transition:width .35s ease, background-color .35s ease}
+    .scale{display:flex;justify-content:space-between;font-size:12px;color:var(--muted)}
+
+    /* verdict */
+    .verdict{display:flex;align-items:center;gap:10px;margin:6px 0}
+    .badge{padding:6px 10px;border-radius:999px;border:1px solid var(--border);font-weight:800;position:relative;cursor:help}
+    .bits{color:var(--muted);font-size:13px}
+
+    /* tooltip */
+    .tooltip{position:absolute;inset:auto auto 125% 0; background:#111; color:#fff; border-radius:8px; padding:8px 10px; font-size:12px; border:1px solid #333; opacity:0; pointer-events:none; transform:translateY(6px); transition:opacity .15s ease .25s, transform .15s ease .25s; width:max-content; max-width:260px; z-index:5}
+    .badge:hover .tooltip{opacity:1; transform:translateY(0)}
+
+    /* checks with animated icons */
+    .checks{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-top:8px}
+    .check{display:flex;align-items:center;gap:10px;padding:10px;border-radius:12px;border:1px solid var(--border);background:var(--surface)}
+    .check .icon{font-weight:800; width:18px; text-align:center; opacity:.8; transition:opacity .2s ease, transform .2s ease}
+    .check.ok .icon{color:var(--ok); opacity:1; animation:pop .25s ease}
+    .check:not(.ok) .icon{color:var(--bad)}
+    @keyframes pop{0%{transform:scale(.6)}100%{transform:scale(1)}}
+
+    /* generator card */
+    .gen-card{background:var(--surface); border-radius:18px; border:1px solid var(--border); overflow:hidden}
+    .gen-head{display:flex;align-items:center;gap:12px; justify-content:space-between; padding:14px 16px; background:color-mix(in srgb, var(--surface) 90%, #fff 10%)}
+    .pw-display{font-weight:800; font-size:18px; letter-spacing:.3px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:62%}
+    .gen-actions{display:flex;align-items:center;gap:10px}
+    .icon-btn{border:1px solid var(--border); background:transparent; color:var(--muted); border-radius:12px; width:40px;height:40px; display:grid;place-items:center; cursor:pointer}
+    .icon-btn:hover{color:var(--text); border-color:color-mix(in srgb,var(--accent) 40%, var(--border))}
+    .copy-btn{border:0; background:var(--accent); color:#001b17; font-weight:900; padding:10px 14px; border-radius:12px; cursor:pointer}
+    .copy-btn:hover{filter:brightness(.95)}
+
+    .gen-body{padding:16px}
+    .divider{height:1px;background:var(--border);margin:10px 0}
+    .chip{display:inline-flex;align-items:center;gap:8px; background:var(--chip); border:1px solid var(--border); padding:8px 10px; border-radius:999px; font-weight:800}
+    .chip.ok{border-color:var(--ok); color:color-mix(in srgb,var(--ok) 85%, #000)}
+    .chip.warn{border-color:var(--warn); color:color-mix(in srgb,var(--warn) 85%, #000)}
+    .chip.bad{border-color:var(--bad); color:color-mix(in srgb,var(--bad) 85%, #fff)}
+
+    .opts{display:flex;flex-wrap:wrap;gap:16px;margin-top:10px}
+    .opts label{display:flex;align-items:center;gap:8px; background:var(--chip); border:1px solid var(--border); padding:8px 10px; border-radius:12px}
+
+    /* range slider */
+    .range-row{display:flex;align-items:center;gap:12px}
+    input[type=range]{ -webkit-appearance:none; appearance:none; width:100%; height:6px; border-radius:999px; background:#cfd3da40; outline:none; }
+    input[type=range]::-webkit-slider-thumb{ -webkit-appearance:none; appearance:none; width:18px; height:18px; border-radius:50%; background:#111; border:2px solid #eee; cursor:pointer }
+    [data-theme="light"] input[type=range]::-webkit-slider-thumb{ background:#111 }
+    .len-badge{min-width:34px; text-align:center; font-weight:800; border:1px solid var(--border); background:var(--chip); padding:4px 8px; border-radius:8px}
+
+    /* presets */
+    .presets{display:flex; gap:8px; flex-wrap:wrap}
+    .preset{border:1px solid var(--border); background:transparent; color:var(--text); padding:8px 10px; border-radius:10px; cursor:pointer}
+    .preset:hover{border-color:color-mix(in srgb,var(--accent) 45%, var(--border))}
+
+    /* crack viz */
+    .crackbar{height:10px; border-radius:999px; background:var(--surface); border:1px solid var(--border); overflow:hidden}
+    .crackfill{height:100%; width:0%; background:linear-gradient(90deg,#ff5252,#ffb300,#00c853); transition:width .4s ease}
+
+    .theme-btn{border:1px solid var(--border);background:transparent;color:var(--text);padding:8px 12px;border-radius:12px;cursor:pointer}
+
+    /* toast */
+    .toast{position:fixed; left:50%; bottom:22px; transform:translate(-50%,0) scale(.95); background:#0b2e24; color:#b7ffe7; border:1px solid #1a5c4a; padding:10px 14px; border-radius:12px; opacity:0; pointer-events:none; transition:opacity .2s ease, transform .2s ease}
+    .toast.show{opacity:1; transform:translate(-50%,0) scale(1)}
+
+    footer{margin-top:8px;color:var(--muted);font-size:12px}
+
+    @media (prefers-reduced-motion: reduce){*{scroll-behavior:auto}}
+  </style>
+</head>
+<body>
+  <div class="app" role="application" id="appRoot" data-strength="weak">
+    <header>
+      <div>
+        <h1>Password Strength Checker</h1>
+        <div class="muted">Real‑time strength • Criteria checks • Suggestions • Generator with slider</div>
+      </div>
+      <button id="themeToggle" class="theme-btn" aria-pressed="false" title="Toggle theme">☀️ Light</button>
+    </header>
+
+    <div class="row">
+      <!-- Left: Checker -->
+      <section aria-labelledby="pw-label">
+        <label id="pw-label" for="pw">Password</label>
+        <div class="input-wrap">
+          <input id="pw" type="password" placeholder="Enter password…" autocomplete="new-password" aria-describedby="pw-help" />
+          <button class="toggle-eye" id="eyeBtn" type="button" aria-label="Show password" aria-pressed="false">👁️</button>
+        </div>
+        <div id="pw-help" class="muted">All processing is local in your browser.</div>
+
+        <div class="meter" aria-hidden="true"><div class="fill" id="fill"></div></div>
+        <div class="scale" aria-hidden="true"><span>Weak</span><span>Medium</span><span>Strong</span></div>
+
+        <div class="verdict" aria-live="polite">
+          <span class="badge bad" id="label">Weak
+            <span class="tooltip" id="whyTip">Short length; add numbers, symbols and upper-case letters.</span>
+          </span>
+          <span class="bits" id="bits">0 bits</span>
+          <span class="bits" id="crack">—</span>
+        </div>
+
+        <div class="crackbar"><div class="crackfill" id="crackfill"></div></div>
+
+        <div class="checks" aria-live="polite" style="margin-top:8px">
+          <div class="check" id="ck-lower"><span class="icon">❌</span><span>Lowercase (a‑z)</span></div>
+          <div class="check" id="ck-upper"><span class="icon">❌</span><span>Uppercase (A‑Z)</span></div>
+          <div class="check" id="ck-num"><span class="icon">❌</span><span>Numbers (0‑9)</span></div>
+          <div class="check" id="ck-sym"><span class="icon">❌</span><span>Symbols (!@#$…)</span></div>
+          <div class="check" id="ck-8"><span class="icon">❌</span><span>At least 8 characters</span></div>
+          <div class="check" id="ck-12"><span class="icon">❌</span><span>Better: 12+ characters</span></div>
+        </div>
+
+        <div style="margin-top:8px">
+          <label for="sug">Suggestions</label>
+          <ul id="sug" style="margin:6px 0 0 18px"></ul>
+        </div>
+      </section>
+
+      <!-- Right: Generator (slider) -->
+      <aside>
+        <div class="gen-card">
+          <div class="gen-head">
+            <div class="pw-display" id="pwDisplay">Use the slider to generate…</div>
+            <div class="gen-actions">
+              <button class="icon-btn" id="regenBtn" title="Generate again" aria-label="Generate again">↻</button>
+              <button class="copy-btn" id="copyBtn" type="button">Copy Password</button>
+            </div>
+          </div>
+          <div class="gen-body">
+            <div class="chip bad" id="genStrength">Password strength: Weak</div>
+            <div class="divider"></div>
+
+            <label class="muted" for="lenRange">Password length:</label>
+            <div class="range-row">
+              <input id="lenRange" type="range" min="8" max="32" value="16" />
+              <div class="len-badge" id="lenVal">16</div>
+            </div>
+
+
+            <div class="divider"></div>
+            <div class="opts">
+              <label><input type="checkbox" id="optUpper" checked> Uppercase</label>
+              <label><input type="checkbox" id="optLower" checked> Lowercase</label>
+              <label><input type="checkbox" id="optNum" checked> Digits</label>
+              <label><input type="checkbox" id="optSym" checked> Symbols</label>
+              <label><input type="checkbox" id="optNoAmbig" checked> Exclude similar (O,0,l,1)</label>
+              <label><input type="checkbox" id="optNoRptSym"> No repeated symbols</label>
+              <label><input type="checkbox" id="optSymPer4"> ≥1 symbol per 4 chars</label>
+            </div>
+            <input id="genOut" type="text" readonly hidden />
+          </div>
+        </div>
+      </aside>
+    </div>
+
+    <footer>Tip: Prefer length (12–20+), avoid reuse, and store in a password manager. Crack‑time here is a rough estimate only.</footer>
+  </div>
+
+  <div id="toast" class="toast" role="status" aria-live="polite">Copied to clipboard! ✅</div>
+
+  <script>
+    // =============== Element Handles ===============
+    const $ = id => document.getElementById(id);
+    const E = {
+      root: $('appRoot'),
+      pw: $('pw'), fill: $('fill'), label: $('label'), bits: $('bits'), crack: $('crack'), crackfill: $('crackfill'), sug: $('sug'),
+      ck: { lower: $('ck-lower'), upper: $('ck-upper'), num: $('ck-num'), sym: $('ck-sym'), len8: $('ck-8'), len12: $('ck-12') },
+      eyeBtn: $('eyeBtn'), whyTip: $('whyTip'),
+      // generator
+      pwDisplay: $('pwDisplay'), genStrength: $('genStrength'), genOut: $('genOut'),
+      regenBtn: $('regenBtn'), copyBtn: $('copyBtn'),
+      optLower: $('optLower'), optUpper: $('optUpper'), optNum: $('optNum'), optSym: $('optSym'), optNoAmbig: $('optNoAmbig'),
+      optNoRptSym: $('optNoRptSym'), optSymPer4: $('optSymPer4'),
+      lenRange: $('lenRange'), lenVal: $('lenVal'),
+      // theme
+      themeToggle: $('themeToggle'),
+      // toast
+      toast: $('toast')
+    };
+
+    // =============== Evaluation Utilities ===============
+    const BAD = [/^password$/i,/^qwerty$/i,/^admin$/i,/^letmein$/i,/^welcome$/i,/^iloveyou$/i,/^123456$/,/^123456789$/,/^111111$/];
+    const SEQS=['abcdefghijklmnopqrstuvwxyz','qwertyuiop','asdfghjkl','zxcvbnm','0123456789'];
+    const hasLower=s=>/[a-z]/.test(s), hasUpper=s=>/[A-Z]/.test(s), hasNum=s=>/\d/.test(s), hasSym=s=>/[^A-Za-z0-9]/.test(s);
+    const repeats=s=>/(.)\1{2,}/.test(s);
+    const hasSeq=s=>{const t=s.toLowerCase(); return SEQS.some(q=>{ for(let i=0;i<q.length-2;i++){ if(t.includes(q.slice(i,i+3))) return true; } return false; }); };
+    const poolSize=s=> (hasLower(s)?26:0)+(hasUpper(s)?26:0)+(hasNum(s)?10:0)+(hasSym(s)?33:0) || 1;
+    const entropyBits=(L,P)=> Math.round(L*Math.log2(P));
+    const fmtTime=sec=>{ if(sec<1) return '<1s'; const u=[[31557600,'yr'],[86400,'d'],[3600,'h'],[60,'m'],[1,'s']]; let out=[]; for(const [v,n] of u){ if(sec>=v){ const c=Math.floor(sec/v); sec-=c*v; out.push(c+n);} if(out.length===2) break; } return out.join(' '); };
+    const crackTime=bits=>{ const FAST=1e10,SLOW=1e5,space=2**Math.max(0,bits),avg=space/2; return {fast:fmtTime(avg/FAST), slow:fmtTime(avg/SLOW), pct: Math.max(0, Math.min(100, Math.round((Math.min(avg/FAST, 31557600*200) / (31557600*200)) * 100))) } };
+
+    // =============== Strength Engine ===============
+    function evaluate(password){
+      const L=password.length; const lower=hasLower(password), upper=hasUpper(password), num=hasNum(password), sym=hasSym(password);
+      const P=poolSize(password); const bits=entropyBits(L,P);
+      let score=0;
+      score += Math.min(40, L*3.2);
+      score += (lower?8:0)+(upper?12:0)+(num?12:0)+(sym?16:0);
+      score += Math.min(14, Math.max(0,bits-42)*0.6);
+      if(repeats(password)) score-=12; if(hasSeq(password)) score-=12; if(/^(.)\1+$/.test(password)) score-=25; if(BAD.some(rx=>rx.test(password))) score-=25;
+      score = Math.max(0, Math.min(100, Math.round(score)));
+
+      let label='Weak', cls='bad', strengthKey='weak';
+      if(score>=75){ label='Strong'; cls='ok'; strengthKey='strong'; } else if(score>=45){ label='Medium'; cls='warn'; strengthKey='medium'; }
+
+      const why=[];
+      if(L<12) why.push('short length');
+      if(!(lower&&upper)) why.push('missing mixed case');
+      if(!num) why.push('no number');
+      if(!sym) why.push('no symbol');
+      if(repeats(password)) why.push('repeats');
+      if(hasSeq(password)) why.push('sequences');
+      if(BAD.some(rx=>rx.test(password))) why.push('common password');
+
+      return {score,label,cls,strengthKey,bits, lower,upper,num,sym, len8:L>=8, len12:L>=12, why};
+    }
+
+    function renderStrength(){
+      const v = evaluate(E.pw.value);
+      E.fill.style.width = v.score + '%';
+      E.label.textContent = v.label;
+      E.label.className = 'badge ' + v.cls;
+      E.root.setAttribute('data-strength', v.strengthKey);
+      E.whyTip.textContent = v.why.length ? ('Why: ' + v.why.join(', ') + '.') : 'Looks solid!';
+      E.bits.textContent = v.bits + ' bits';
+      const t = crackTime(v.bits); E.crack.textContent = `~crack: ${t.slow} (slow) / ${t.fast} (fast)`;
+      E.crackfill.style.width = t.pct + '%';
+      // checks visuals
+      const upd=(el, ok)=>{ el.classList.toggle('ok', ok); el.querySelector('.icon').textContent = ok ? '✅' : '❌'; };
+      upd(E.ck.lower, v.lower); upd(E.ck.upper, v.upper); upd(E.ck.num, v.num); upd(E.ck.sym, v.sym); upd(E.ck.len8, v.len8); upd(E.ck.len12, v.len12);
+      // suggestions
+      E.sug.innerHTML='';
+      const suggestions=[];
+      if(v.len12===false) suggestions.push('Increase length to 12+ characters.');
+      if(!(v.lower&&v.upper)) suggestions.push('Mix UPPER and lower case letters.');
+      if(!v.num) suggestions.push('Add at least one number.');
+      if(!v.sym) suggestions.push('Add at least one symbol.');
+      if(v.why.includes('repeats')) suggestions.push('Avoid repeating characters like "aaa" or "111".');
+      if(v.why.includes('sequences')) suggestions.push('Avoid sequences like "abc" or "123".');
+      suggestions.forEach(s=>{ const li=document.createElement('li'); li.textContent=s; E.sug.appendChild(li); });
+    }
+
+    // =============== Generator with Slider & Rules ===============
+    const SETS = {
+      lower:'abcdefghijkmnopqrstuvwxyz', // remove visually confusing l
+      upper:'ABCDEFGHJKLMNPQRSTUVWXYZ', // remove I O
+      num:'23456789', // remove 0 1
+      sym:'!@#$%^&*()-_=+[]{};:,.?/~'
+    };
+    const AMBIG=/[O0Il1]/g;
+    function randomInt(max){ if(crypto?.getRandomValues){const a=new Uint32Array(1); crypto.getRandomValues(a); return a[0]%max;} return Math.floor(Math.random()*max); }
+    const pick=s=> s[randomInt(s.length)];
+
+    function buildAlphabet(){
+      let a='';
+      if(E.optLower.checked) a+= E.optNoAmbig.checked ? SETS.lower : 'abcdefghijklmnopqrstuvwxyz';
+      if(E.optUpper.checked) a+= E.optNoAmbig.checked ? SETS.upper : 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+      if(E.optNum.checked)   a+= E.optNoAmbig.checked ? SETS.num   : '0123456789';
+      if(E.optSym.checked)   a+= SETS.sym;
+      return E.optNoAmbig.checked ? a.replace(AMBIG, '') : a;
+    }
+
+    function generatePassword(length){
+      const alpha=buildAlphabet(); if(!alpha) return '';
+      const req=[],
+        lowerSet = E.optNoAmbig.checked?SETS.lower:'abcdefghijklmnopqrstuvwxyz',
+        upperSet = E.optNoAmbig.checked?SETS.upper:'ABCDEFGHIJKLMNOPQRSTUVWXYZ',
+        numSet   = E.optNoAmbig.checked?SETS.num  :'0123456789',
+        symSet   = SETS.sym;
+
+      if(E.optLower.checked) req.push(pick(lowerSet));
+      if(E.optUpper.checked) req.push(pick(upperSet));
+      if(E.optNum.checked)   req.push(pick(numSet));
+      if(E.optSym.checked)   req.push(pick(symSet));
+
+      // density rule: ≥1 symbol per 4 chars
+      const needSym = E.optSymPer4.checked && E.optSym.checked ? Math.max(0, Math.ceil(length/4) - req.filter(c=>symSet.includes(c)).length) : 0;
+      for(let i=0;i<needSym;i++) req.push(pick(symSet));
+
+      const out=[...req];
+      let lastSym=null;
+      for(let i=req.length;i<length;i++){
+        let ch = pick(alpha);
+        if(E.optNoRptSym.checked && symSet.includes(ch) && ch===lastSym){ // avoid repeated symbols consecutively
+          let attempts=0; do{ ch = pick(alpha); attempts++; } while(symSet.includes(ch) && ch===lastSym && attempts<10);
+        }
+        lastSym = symSet.includes(ch) ? ch : lastSym;
+        out.push(ch);
+      }
+      // Fisher-Yates shuffle
+      for(let i=out.length-1;i>0;i--){ const j=randomInt(i+1); [out[i],out[j]]=[out[j],out[i]]; }
+      return out.join('');
+    }
+
+    function setGenerated(p){
+      if(!p) return;
+      E.genOut.value=p; E.pw.value=p; E.pwDisplay.textContent=p;
+      const ev=evaluate(p); renderStrength();
+      E.genStrength.textContent = `Password strength: ${ev.label}`;
+      E.genStrength.className = 'chip ' + ev.cls;
+    }
+
+    function regen(){ setGenerated(generatePassword(+E.lenRange.value)); }
+
+    // Events for generator
+    E.lenRange.addEventListener('input', ()=>{ E.lenVal.textContent=E.lenRange.value; regen(); });
+    ;['optLower','optUpper','optNum','optSym','optNoAmbig','optNoRptSym','optSymPer4'].forEach(id=>{
+      $(id).addEventListener('change', regen);
+    });
+    E.regenBtn.addEventListener('click', regen);
+
+    // Preset buttons
+    document.querySelectorAll('.preset').forEach(btn=>{
+      btn.addEventListener('click',()=>{ E.lenRange.value=btn.dataset.len; E.lenVal.textContent=btn.dataset.len; regen(); });
+    });
+
+    // Copy + toast
+    E.copyBtn.addEventListener('click', async ()=>{
+      const v=E.genOut.value || E.pwDisplay.textContent; if(!v || v.startsWith('Use the slider')) return;
+      try{ await navigator.clipboard.writeText(v); E.toast.textContent='Copied to clipboard! ✅'; showToast(); }catch{ E.toast.textContent='Copy failed'; showToast(); }
+    });
+    function showToast(){ E.toast.classList.add('show'); setTimeout(()=>E.toast.classList.remove('show'), 1200); }
+
+    // =============== Events (checker) ===============
+    let raf; E.pw.addEventListener('input', ()=>{ cancelAnimationFrame(raf); raf=requestAnimationFrame(renderStrength); E.pwDisplay.textContent=E.pw.value||'Use the slider to generate…'; const ev=evaluate(E.pw.value); E.genStrength.textContent = `Password strength: ${ev.label}`; E.genStrength.className='chip '+ev.cls; });
+    renderStrength();
+
+    // Keyboard shortcut: Enter to recheck / regen
+    document.addEventListener('keydown', (e)=>{ if(e.key==='Enter'){ if(document.activeElement===E.pw || document.activeElement===E.lenRange) renderStrength(); else regen(); } });
+
+    // Initialize generator
+    E.lenVal.textContent=E.lenRange.value; regen();
+
+    // show/hide
+    E.eyeBtn.addEventListener('click', e=>{ const is=E.pw.type==='password'; E.pw.type=is?'text':'password'; e.currentTarget.textContent=is?'🙈':'👁️'; e.currentTarget.setAttribute('aria-pressed', String(is)); });
+
+    // =============== Theme Toggle with Persistence ===============
+    function applyTheme(theme){
+      if(theme==='light'){
+        document.documentElement.setAttribute('data-theme','light');
+        E.themeToggle.textContent='🌙 Dark';
+        E.themeToggle.setAttribute('aria-pressed','true');
+      }else{
+        document.documentElement.removeAttribute('data-theme');
+        E.themeToggle.textContent='☀️ Light';
+        E.themeToggle.setAttribute('aria-pressed','false');
+      }
+      localStorage.setItem('ps_theme', theme);
+    }
+    applyTheme(localStorage.getItem('ps_theme') || 'dark');
+    E.themeToggle.addEventListener('click',()=>{
+      const cur = document.documentElement.getAttribute('data-theme')==='light' ? 'light' : 'dark';
+      applyTheme(cur==='light' ? 'dark' : 'light');
+    });
+  </script>
+</body>
+</html>
